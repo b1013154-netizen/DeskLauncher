@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'">
+<title>DeskLauncher 設定</title>
+<link rel="stylesheet" href="panel.css">
+<link rel="stylesheet" href="settings.css">
+</head>
+<body>
+<div class="titlebar"><span class="app-name">DeskLauncher</span><span class="saved" id="saved">変更は自動で保存されます</span></div>
+<div class="layout">
+  <nav class="side">
+    <div class="brand">
+      <div class="logo">▦</div>
+      <div><div class="brand-name">DeskLauncher</div><div class="brand-sub">設定</div></div>
+    </div>
+    <button class="nav on" data-tab="buttons"><span>🔘</span>ボタン</button>
+    <button class="nav" data-tab="look"><span>🎨</span>見た目</button>
+    <button class="nav" data-tab="behavior"><span>⚙️</span>動作</button>
+    <button class="nav" data-tab="backup"><span>💾</span>バックアップと移行</button>
+    <button class="nav" data-tab="help"><span>📖</span>ヘルプ（説明書）</button>
+    <div class="side-foot" id="version"></div>
+  </nav>
+  <main id="main">
+    <section class="tab on" id="tab-buttons"></section>
+    <section class="tab" id="tab-look"></section>
+    <section class="tab" id="tab-behavior"></section>
+    <section class="tab" id="tab-backup"></section>
+    <section class="tab" id="tab-help"></section>
+  </main>
+</div>
+<div class="modal-back" id="modal"></div>
+<div class="snack" id="snack"></div>
+<script src="common.js"></script>
+<script src="markdown.js"></script>
+<script src="settings.js"></script>
+</body>
+</html>

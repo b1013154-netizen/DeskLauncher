@@ -1,0 +1,118 @@
+/* ランチャーのパネル（本体と設定画面のプレビューで共用） */
+.dl-panel {
+  position: relative;
+  display: inline-flex;
+  flex-direction: column;
+  padding: var(--pad);
+  padding-top: calc(var(--pad) * .6);
+  border-radius: var(--panel-radius);
+  border: var(--border);
+  overflow: hidden;
+  isolation: isolate;
+  font-family: "Segoe UI Variable Text", "Segoe UI", "Yu Gothic UI", "Meiryo UI", "Noto Sans JP", sans-serif;
+  color: var(--label);
+  user-select: none;
+}
+.dl-panel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--bg);
+  opacity: var(--bg-opacity);
+  z-index: -1;
+}
+.dl-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+  margin-bottom: calc(var(--pad) * .5);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .02em;
+  text-shadow: var(--label-shadow);
+}
+.dl-head .dl-title { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: .9; }
+.dl-head button {
+  all: unset;
+  width: 22px; height: 22px;
+  display: grid; place-items: center;
+  border-radius: 7px;
+  font-size: 13px;
+  cursor: pointer;
+  opacity: .7;
+  transition: background .15s, opacity .15s;
+}
+.dl-head button:hover { background: var(--btn-bg-hover); opacity: 1; }
+.dl-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--cols), var(--cell));
+  grid-auto-rows: auto;
+  gap: var(--gap);
+}
+.dl-slot { min-height: var(--cell); }
+.dl-btn {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: var(--cell);
+  padding: 8px 4px 7px;
+  box-sizing: border-box;
+  border-radius: var(--btn-radius);
+  background: var(--btn-bg);
+  cursor: pointer;
+  transition: transform .12s ease, background .15s, box-shadow .2s;
+}
+.dl-btn:hover { background: var(--btn-bg-hover); transform: translateY(-1px); }
+.dl-btn:active, .dl-btn.dl-pressed { transform: scale(.94); }
+.dl-btn.dl-done { box-shadow: 0 0 0 2px var(--accent); }
+.dl-btn.dl-fail { box-shadow: 0 0 0 2px #ff5d6c; animation: dl-shake .3s; }
+@keyframes dl-shake { 25% { translate: -3px 0 } 75% { translate: 3px 0 } }
+.dl-ico {
+  display: grid;
+  place-items: center;
+  flex: none;
+  line-height: 1;
+}
+.dl-ico img { width: 100%; height: 100%; object-fit: contain; border-radius: 18%; pointer-events: none; }
+.dl-ico-letter { border-radius: 26%; background: var(--accent); color: #fff; font-weight: 700; }
+.dl-ico-emoji { font-family: "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif; }
+.dl-folder { position: relative; }
+.dl-folder::after {
+  content: "";
+  position: absolute;
+  right: -3px; bottom: -3px;
+  width: 9px; height: 9px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 2px rgba(0,0,0,.18);
+}
+.dl-lbl {
+  max-width: 100%;
+  font-size: var(--font);
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-shadow: var(--label-shadow);
+}
+.dl-no-labels .dl-btn { gap: 0; }
+.dl-dots {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  height: 8px;
+  margin-top: calc(var(--pad) * .6);
+}
+.dl-dot {
+  width: 6px; height: 6px;
+  border-radius: 3px;
+  background: var(--label);
+  opacity: .3;
+  cursor: pointer;
+  transition: width .2s, opacity .2s, background .2s;
+}
+.dl-dot.dl-on { width: 16px; opacity: 1; background: var(--accent); }

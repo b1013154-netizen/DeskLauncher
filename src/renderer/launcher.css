@@ -1,0 +1,22 @@
+html, body { margin: 0; background: transparent; overflow: hidden; }
+body { display: inline-block; }
+#panel.dl-panel { display: inline-flex; }
+body.unlocked .dl-head, body.unlocked .dl-dots { -webkit-app-region: drag; }
+body.unlocked .dl-head button, body.unlocked .dl-dot { -webkit-app-region: no-drag; }
+body.unlocked .dl-grid { -webkit-app-region: drag; }
+body.unlocked .dl-btn { -webkit-app-region: no-drag; }
+#toast {
+  position: fixed;
+  left: 8px; right: 8px; bottom: 8px;
+  padding: 7px 10px;
+  border-radius: 10px;
+  background: rgba(20, 20, 28, .92);
+  color: #fff;
+  font: 12px/1.4 "Segoe UI", "Yu Gothic UI", sans-serif;
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity .2s, transform .2s;
+  pointer-events: none;
+}
+#toast.show { opacity: 1; transform: none; }
+#toast.error { background: rgba(160, 30, 45, .95); }
