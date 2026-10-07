@@ -90,6 +90,10 @@
 
   panel.addEventListener('contextmenu', e => { e.preventDefault(); window.dl.contextMenu(null); });
 
+  // ホットキーなどで一時的に前に出したとき、マウスが離れたら元の重なり順に戻す
+  document.documentElement.addEventListener('mouseenter', () => window.dl.pointer(true));
+  document.documentElement.addEventListener('mouseleave', () => window.dl.pointer(false));
+
   const init = await window.dl.getConfig();
   config = init.config;
   render();

@@ -54,22 +54,74 @@
   let pendingEcho = 0;
 
   // ---------- 保存 ----------
-  let saveTimer;
+  // 変更はすぐランチャーに反映（プレビュー）し、「保存」を押したときにファイルへ書き込む
+  let dirty = !!init.dirty;
+  let savedAt = null;
+  let previewTimer;
+
+  function renderSaveBar() {
+    const bar = $('#savebar');
+    bar.textContent = '';
+    const time = savedAt ? `（${savedAt.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}）` : '';
+    bar.append(...[
+      dirty
+        ? h('span', { class: 'save-state dirty' }, h('i'), '保存していない変更があります')
+        : h('span', { class: 'save-state clean' }, `✓ すべて保存済み${time}`),
+      dirty ? h('button', { class: 'btn small ghost', onclick: revert }, '元に戻す') : null,
+      h('button', { class: 'btn small primary save-btn', disabled: !dirty, title: 'Ctrl + S でも保存できます', onclick: () => commit() }, '💾 保存')
+    ].filter(Boolean));
+  }
+
+  function setDirty(v) {
+    dirty = v;
+    if (!v) savedAt = new Date();
+    renderSaveBar();
+  }
+
+  // 画面に反映する（保存はしない）。immediate なら結果を待てる
   function save(immediate) {
-    clearTimeout(saveTimer);
+    clearTimeout(previewTimer);
+    if (!dirty) setDirty(true);
     const run = async () => {
       pendingEcho++;
-      const res = await window.dl.setConfig(cfg);
+      const res = await window.dl.previewConfig(cfg);
       hotkeyStatus = res.hotkeyStatus;
-      const s = $('#saved');
-      s.textContent = '保存しました';
-      s.classList.add('flash');
-      setTimeout(() => { s.textContent = '変更は自動で保存されます'; s.classList.remove('flash'); }, 1400);
       return res;
     };
     if (immediate) return run();
-    saveTimer = setTimeout(run, 250);
+    previewTimer = setTimeout(run, 200);
   }
+
+  async function commit() {
+    clearTimeout(previewTimer);
+    pendingEcho++;
+    const res = await window.dl.setConfig(cfg);
+    hotkeyStatus = res.hotkeyStatus;
+    if (res.saved) {
+      setDirty(false);
+      snack('設定を保存しました ✓');
+    } else {
+      snack('保存できませんでした。もう一度お試しください', true);
+    }
+    return res;
+  }
+
+  function revert() {
+    confirmBox('変更を元に戻しますか？', '最後に保存した状態に戻します。', '元に戻す', async () => {
+      clearTimeout(previewTimer);
+      pendingEcho++;
+      const res = await window.dl.revertConfig();
+      cfg = res.config;
+      hotkeyStatus = res.hotkeyStatus;
+      setDirty(false);
+      renderAll();
+      snack('最後に保存した状態に戻しました');
+    });
+  }
+
+  document.addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); commit(); }
+  });
 
   // 列数・行数を変えると、はみ出したボタンが新しいページに移るので正規化後の設定を受け取る
   async function saveAndReload() {
@@ -745,7 +797,7 @@
         row('文字の大きさ', slider(a.fontSize, 8, 18, 1, 'px', v => setA('fontSize')(v)))));
     const pane = h('div', { class: 'preview-pane' },
       h('div', { class: 'preview-stage' }, lookPreview),
-      h('div', { class: 'preview-cap' }, 'プレビュー（デスクトップのランチャーにもすぐ反映されます）'));
+      h('div', { class: 'preview-cap' }, 'プレビュー（デスクトップのランチャーにもすぐ反映されます。残すときは右上の「保存」を押してください）'));
     tab.append(h('h1', null, '見た目'), h('p', { class: 'lead' }, '色・枠・背景・大きさ・並べる数を自由に変えられます。'),
       h('div', { class: 'look-layout' }, controls, pane));
     updateLookPreview();
@@ -851,7 +903,7 @@
             const r = await window.dl.importConfig();
             if (!r.ok && !r.message) return;
             lastImport = r;
-            if (r.ok) { const res = await window.dl.getConfig(); cfg = res.config; nav.folders = []; nav.pageIndex = 0; nav.selId = null; renderAll(); showTab('backup'); }
+            if (r.ok) { const res = await window.dl.getConfig(); cfg = res.config; nav.folders = []; nav.pageIndex = 0; nav.selId = null; setDirty(false); renderAll(); showTab('backup'); }
             else renderBackupTab();
           } }, '設定をインポート…'), result)),
       h('div', { class: 'card' }, h('h2', null, '新しい PC への移行手順'),
@@ -870,6 +922,7 @@
             await window.dl.resetConfig();
             const res = await window.dl.getConfig();
             cfg = res.config; nav.folders = []; nav.pageIndex = 0; nav.selId = null;
+            setDirty(false);
             renderAll();
             snack('初期状態に戻しました');
           }) }, '初期状態に戻す…'),
@@ -961,6 +1014,7 @@
   }
 
   if (nav.selId && locate(nav.selId)) selectById(nav.selId);
+  renderSaveBar();
   renderAll();
   const startTab = new URLSearchParams(location.search).get('tab');
   if (startTab) showTab(startTab);

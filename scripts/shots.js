@@ -37,6 +37,12 @@ module.exports = async function ({ app, getLauncher, openSettings, getSettings }
     await js(`window.__dl.closeModal(); window.__dl.showTab('look')`);
     await wait(500);
     await shot(s, 'settings-look');
+    await js(`document.querySelectorAll('.theme')[3].click()`);
+    await wait(500);
+    await shot(s, 'settings-dirty');
+    await js(`document.querySelector('.save-btn').click()`);
+    await wait(600);
+    await shot(s, 'settings-saved');
     await js(`window.__dl.showTab('behavior')`);
     await wait(400);
     await shot(s, 'settings-behavior');

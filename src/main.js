@@ -13,7 +13,9 @@ if (!app.requestSingleInstanceLock()) app.quit();
 const CONFIG_FILE = () => path.join(app.getPath('userData'), 'config.json');
 const ASSET = name => path.join(__dirname, '..', 'build', name);
 
-let config;
+let config; // 画面に反映中の設定（保存前の変更を含む）
+let saved; // ファイルに保存済みの設定
+let dirty = false; // 設定画面に未保存の変更があるか
 let launcher = null;
 let settings = null;
 let tray = null;
@@ -53,8 +55,8 @@ function createLauncher() {
     clearTimeout(moveTimer);
     moveTimer = setTimeout(() => {
       const [x, y] = launcher.getPosition();
-      config.behavior.x = x;
-      config.behavior.y = y;
+      // 位置は未保存の変更とは別に、その場で保存する
+      for (const c of [config, saved]) { c.behavior.x = x; c.behavior.y = y; }
       persist();
     }, 400);
   });
@@ -74,12 +76,34 @@ function ensureOnScreen() {
   }
 }
 
+function currentZOrder() {
+  return raised ? 'top' : config.behavior.zOrder;
+}
+
+// Electron の setAlwaysOnTop だけでは、フォーカスを取らないウィンドウで最前面が
+// 解除されないことがあるため、Windows API でも明示的に設定する
 function applyZOrder() {
   if (!launcher) return;
-  const z = raised ? 'top' : config.behavior.zOrder;
+  const z = currentZOrder();
   launcher.setAlwaysOnTop(z === 'top', 'floating');
+  win32.setTopmost(launcher, z === 'top');
   if (z === 'bottom') win32.sendToBottom(launcher);
   else if (raised) launcher.moveTop();
+  updateBottomKeeper(z === 'bottom');
+}
+
+// 「デスクトップに貼り付け」の間は、ほかのウィンドウの操作で前に出てきても一番後ろへ戻す
+let bottomTimer = null;
+function updateBottomKeeper(on) {
+  if (on && !bottomTimer) bottomTimer = setInterval(() => { if (launcher && currentZOrder() === 'bottom') win32.sendToBottom(launcher); }, 2000);
+  if (!on && bottomTimer) { clearInterval(bottomTimer); bottomTimer = null; }
+}
+
+// 一時的に前に出したランチャーを、マウスが離れたら元の表示の優先度に戻す
+let lowerTimer = null;
+function scheduleLower() {
+  clearTimeout(lowerTimer);
+  if (raised) lowerTimer = setTimeout(lowerLauncher, 1500);
 }
 
 function showLauncher() {
@@ -106,8 +130,15 @@ function toggleLauncher() {
 }
 
 function lowerLauncher() {
+  clearTimeout(lowerTimer);
   raised = false;
   applyZOrder();
+}
+
+// タスクトレイや二重起動から表示したときは、一度だけ前に出す
+function bringToFront() {
+  raised = config.behavior.zOrder !== 'top';
+  showLauncher();
 }
 
 function registerHotkey() {
@@ -159,24 +190,57 @@ function openSettings(buttonId, tab) {
   });
   settings.loadFile(path.join(__dirname, 'renderer', 'settings.html'), { query: Object.assign({}, buttonId && { select: buttonId }, tab && { tab }) });
   settings.once('ready-to-show', () => settings.show());
+  // 未保存の変更があるまま閉じようとしたら、保存するか確認する
+  settings.on('close', e => {
+    if (!dirty) return;
+    const r = dialog.showMessageBoxSync(settings, {
+      type: 'question',
+      title: 'DeskLauncher',
+      message: '保存していない変更があります。',
+      detail: '変更を保存してから閉じますか？',
+      buttons: ['保存して閉じる', '保存せずに閉じる', 'キャンセル'],
+      defaultId: 0,
+      cancelId: 2,
+      noLink: true
+    });
+    if (r === 0) applyConfig(config);
+    else if (r === 1) revertConfig();
+    else e.preventDefault();
+  });
   settings.on('closed', () => { settings = null; });
 }
 
 // ---------- 設定の保存と反映 ----------
 function persist() {
-  try { store.save(CONFIG_FILE(), config); } catch (e) { console.error('save failed', e); }
+  try { store.save(CONFIG_FILE(), saved); return true; } catch (e) { console.error('save failed', e); return false; }
 }
 
-function applyConfig(next) {
+const clone = o => JSON.parse(JSON.stringify(o));
+
+// 設定を画面に反映する。save が true ならファイルにも保存する（false は保存前のプレビュー）
+function applyConfig(next, { save = true } = {}) {
   const prev = config;
   config = store.normalize(next);
-  persist();
+  if (prev && prev.behavior.zOrder !== config.behavior.zOrder) lowerLauncher();
   if (!prev || prev.behavior.hotkey !== config.behavior.hotkey || prev.behavior.hotkeyEnabled !== config.behavior.hotkeyEnabled) registerHotkey();
-  if (!prev || prev.behavior.autoStart !== config.behavior.autoStart) applyAutoStart();
+  let ok = true;
+  if (save) {
+    saved = clone(config);
+    ok = persist();
+    dirty = !ok;
+    applyAutoStart();
+  } else {
+    dirty = true;
+  }
   applyZOrder();
   updateTrayMenu();
   broadcast('config-changed', config);
-  return { config, hotkeyStatus };
+  return { config, hotkeyStatus, saved: save && ok, dirty };
+}
+
+// 未保存の変更を捨てて、保存済みの設定に戻す
+function revertConfig() {
+  return applyConfig(clone(saved));
 }
 
 function broadcast(channel, payload) {
@@ -199,7 +263,7 @@ function createTray() {
 function updateTrayMenu() {
   if (!tray) return;
   tray.setContextMenu(Menu.buildFromTemplate([
-    { label: 'ランチャーを表示', click: () => { raised = config.behavior.zOrder !== 'top'; showLauncher(); } },
+    { label: 'ランチャーを表示', click: bringToFront },
     { label: 'ランチャーを隠す', click: () => launcher && launcher.hide() },
     { type: 'separator' },
     { label: '設定を開く…', click: () => openSettings() },
@@ -211,13 +275,20 @@ function updateTrayMenu() {
 }
 
 function setLocked(v) {
+  // ロックはその場で保存する（未保存の変更には影響させない）
   config.behavior.locked = v;
-  applyConfig(config);
+  saved.behavior.locked = v;
+  persist();
+  updateTrayMenu();
+  broadcast('config-changed', config);
 }
 
 // ---------- IPC ----------
-ipcMain.handle('config:get', () => ({ config, hotkeyStatus, platform: process.platform, version: app.getVersion() }));
+ipcMain.handle('config:get', () => ({ config, hotkeyStatus, dirty, platform: process.platform, version: app.getVersion() }));
+ipcMain.handle('config:preview', (_e, cfg) => applyConfig(cfg, { save: false }));
 ipcMain.handle('config:set', (_e, cfg) => applyConfig(cfg));
+ipcMain.handle('config:revert', () => revertConfig());
+ipcMain.handle('launcher:pointer', (_e, inside) => (inside ? clearTimeout(lowerTimer) : scheduleLower()));
 
 ipcMain.handle('launcher:resize', (_e, { width, height }) => {
   if (!launcher) return;
@@ -387,16 +458,18 @@ ipcMain.handle('docs:openExternal', async (_e, id) => {
 ipcMain.handle('app:quit', () => app.quit());
 
 // ---------- 起動 ----------
-app.on('second-instance', () => { raised = config.behavior.zOrder !== 'top'; showLauncher(); });
+app.on('second-instance', bringToFront);
 
 app.whenReady().then(() => {
   config = store.load(CONFIG_FILE());
+  saved = clone(config);
   persist();
   createLauncher();
   createTray();
   registerHotkey();
   applyAutoStart();
   if (process.argv.includes('--settings')) openSettings();
+  if (process.env.DL_SELFTEST) require('../scripts/selftest')({ app, getLauncher: () => launcher, applyConfig, toggleLauncher, getConfig: () => config, actions, win32 });
   if (process.env.DL_SHOTS) require('../scripts/shots')({ app, getLauncher: () => launcher, openSettings, getSettings: () => settings });
 });
 

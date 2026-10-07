@@ -10,6 +10,9 @@ const on = channel => cb => {
 contextBridge.exposeInMainWorld('dl', {
   getConfig: () => ipcRenderer.invoke('config:get'),
   setConfig: cfg => ipcRenderer.invoke('config:set', cfg),
+  previewConfig: cfg => ipcRenderer.invoke('config:preview', cfg),
+  revertConfig: () => ipcRenderer.invoke('config:revert'),
+  pointer: inside => ipcRenderer.invoke('launcher:pointer', inside),
   run: id => ipcRenderer.invoke('launcher:run', id),
   resize: size => ipcRenderer.invoke('launcher:resize', size),
   contextMenu: id => ipcRenderer.invoke('launcher:context', id),
