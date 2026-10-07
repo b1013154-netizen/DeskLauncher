@@ -9,7 +9,8 @@ function lib() {
   const user32 = koffi.load('user32.dll');
   api = {
     keybd_event: user32.func('void __stdcall keybd_event(uint8_t bVk, uint8_t bScan, uint32_t dwFlags, uintptr_t dwExtraInfo)'),
-    SetWindowPos: user32.func('bool __stdcall SetWindowPos(intptr_t hWnd, intptr_t hWndInsertAfter, int X, int Y, int cx, int cy, uint32_t uFlags)')
+    SetWindowPos: user32.func('bool __stdcall SetWindowPos(intptr_t hWnd, intptr_t hWndInsertAfter, int X, int Y, int cx, int cy, uint32_t uFlags)'),
+    GetWindowLongPtrW: user32.func('intptr_t __stdcall GetWindowLongPtrW(intptr_t hWnd, int nIndex)')
   };
   return api;
 }
@@ -64,16 +65,41 @@ async function sendCombo(combo) {
   await sleep(30);
 }
 
-// ウィンドウを Z オーダーの一番下へ移す（「常に最背面」用）
-function sendToBottom(win) {
-  if (!isWin) return;
+const HWND_TOPMOST = -1;
+const HWND_NOTOPMOST = -2;
+const HWND_BOTTOM = 1;
+const SWP_KEEP = 0x0001 /* NOSIZE */ | 0x0002 /* NOMOVE */ | 0x0010 /* NOACTIVATE */;
+
+function hwndOf(win) {
+  const buf = win.getNativeWindowHandle();
+  return buf.length >= 8 ? Number(buf.readBigUInt64LE(0)) : buf.readUInt32LE(0);
+}
+
+function setPos(win, insertAfter) {
+  if (!isWin || !win || win.isDestroyed()) return;
   try {
-    const buf = win.getNativeWindowHandle();
-    const hwnd = buf.length >= 8 ? Number(buf.readBigUInt64LE(0)) : buf.readUInt32LE(0);
-    lib().SetWindowPos(hwnd, 1 /* HWND_BOTTOM */, 0, 0, 0, 0, 0x0001 | 0x0002 | 0x0010);
+    lib().SetWindowPos(hwndOf(win), insertAfter, 0, 0, 0, 0, SWP_KEEP);
   } catch (e) {
-    console.error('sendToBottom failed', e);
+    console.error('SetWindowPos failed', e);
   }
 }
 
-module.exports = { isWin, sendCombo, sendToBottom, keyNames: Object.keys(VK), vkOf };
+// 最前面（TOPMOST）を付けるか外す
+function setTopmost(win, on) {
+  setPos(win, on ? HWND_TOPMOST : HWND_NOTOPMOST);
+}
+
+// ウィンドウを Z オーダーの一番下へ移す（「デスクトップに貼り付け」用）
+function sendToBottom(win) {
+  setPos(win, HWND_NOTOPMOST);
+  setPos(win, HWND_BOTTOM);
+}
+
+// 動作確認用: 今 TOPMOST かどうか（Windows 以外は null）
+function isTopmost(win) {
+  if (!isWin) return null;
+  const exStyle = Number(lib().GetWindowLongPtrW(hwndOf(win), -20 /* GWL_EXSTYLE */));
+  return (exStyle & 0x8 /* WS_EX_TOPMOST */) !== 0;
+}
+
+module.exports = { isWin, sendCombo, setTopmost, sendToBottom, isTopmost, lib, keyNames: Object.keys(VK), vkOf };

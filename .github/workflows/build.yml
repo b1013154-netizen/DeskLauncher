@@ -17,6 +17,12 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run check
+      - name: Windows 上での動作確認（表示の優先度・キー送信・コマンド実行）
+        run: npx electron .
+        env:
+          DL_SELFTEST: ${{ runner.temp }}\selftest.json
+          DL_USERDATA: ${{ runner.temp }}\dl-userdata
+        timeout-minutes: 3
       - run: npx electron-builder --win nsis portable --x64 --publish never
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'

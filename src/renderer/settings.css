@@ -27,13 +27,20 @@ button, input, select, textarea { font: inherit; color: inherit; }
   align-items: center;
   gap: 14px;
   padding: 0 150px 0 18px;
+  /* 右側はウィンドウの最小化・閉じるボタンの領域 */
   -webkit-app-region: drag;
   border-bottom: 1px solid var(--line);
   background: rgba(255,255,255,.7);
 }
 .app-name { font-weight: 600; font-size: 12.5px; color: var(--ink-2); }
-.saved { margin-left: auto; font-size: 12px; color: var(--ink-3); transition: color .3s; }
-.saved.flash { color: var(--ok); }
+.savebar { margin-left: auto; display: flex; align-items: center; gap: 8px; -webkit-app-region: no-drag; }
+.save-state { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 550; }
+.save-state.clean { color: var(--ok); }
+.save-state.dirty { color: #b26a00; }
+.save-state.dirty i { width: 8px; height: 8px; border-radius: 50%; background: #f29d1f; box-shadow: 0 0 0 3px rgba(242, 157, 31, .2); }
+.save-btn { min-width: 84px; justify-content: center; }
+.btn:disabled { opacity: .45; cursor: default; transform: none; }
+.btn.primary:disabled:hover { background: var(--accent); }
 .layout { display: flex; height: calc(100% - 44px); }
 .side {
   width: 228px;
